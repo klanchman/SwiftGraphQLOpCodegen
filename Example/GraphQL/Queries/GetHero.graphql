@@ -1,0 +1,6 @@
+query GetHuman($id: ID!) {
+  human(id: $id) {
+    ...CharacterBasicInfo
+    mass
+  }
+}

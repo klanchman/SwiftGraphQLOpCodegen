@@ -1,0 +1,3 @@
+schema: Example/GraphQL/schema.graphqls
+documents:
+  - 'Example/GraphQL/**/*.graphql'

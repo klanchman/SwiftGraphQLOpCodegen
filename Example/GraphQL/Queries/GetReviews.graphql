@@ -1,0 +1,5 @@
+query GetReviews($episode: Episode! = EMPIRE) {
+  reviews(episode: $episode) {
+    ...ReviewBasicInfo
+  }
+}

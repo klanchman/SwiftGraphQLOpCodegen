@@ -1,0 +1,4 @@
+fragment CharacterBasicInfo on Character {
+  id
+  name
+}

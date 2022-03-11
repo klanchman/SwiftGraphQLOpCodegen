@@ -1,0 +1,4 @@
+fragment ReviewBasicInfo on Review {
+  stars
+  episode
+}
