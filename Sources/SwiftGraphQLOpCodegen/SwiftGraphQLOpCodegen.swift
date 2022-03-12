@@ -18,6 +18,7 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
         print("You gave us these files: \(files)")
 
         let fm = FileManager()
+        var sources = [File]()
 
         for file in files {
             guard
@@ -28,23 +29,19 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
                 continue
             }
 
-            do {
-                let generatedFiles = try CodeGenerator(source: source).generate()
+            sources.append(File(path: file, content: source))
+        }
 
-                guard !generatedFiles.isEmpty else {
-                    continue
-                }
+        do {
+            let generatedFiles = try CodeGenerator(sources: sources).generate()
 
-                // FIXME: Output the files
-                print("\nFile: \(file)")
-                for generatedFile in generatedFiles {
-                    print("\nSave filename: \(generatedFile.filename)\n")
-                    print(generatedFile.contents)
-                }
-            } catch {
-                print("\nError running codegen for file \(file): \(error)")
-                continue
+            // FIXME: Output the files
+            for generatedFile in generatedFiles {
+                print("\nGenerate file: \(generatedFile.path)\n")
+                print(generatedFile.content)
             }
+        } catch {
+            print("\nError running codegen: \(error)")
         }
     }
 }
