@@ -13,7 +13,7 @@ class CodeGenerator {
     func generate() throws -> [File] {
         var files = [File]()
 
-        for (operationName, operation) in context.operations {
+        for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
             let mergedSource = try mergeFragments(operation: operation)
             let minifiedSource = Self.minify(mergedSource)
 
@@ -50,7 +50,7 @@ class CodeGenerator {
             neededFragments.formUnion(try fragmentsReferencedBy(fragment: fragment))
         }
 
-        for fragmentName in neededFragments {
+        for fragmentName in neededFragments.sorted(by: <) {
             guard let fragment = context.fragments[fragmentName] else {
                 throw CodegenError.unknownDefinition(fragmentName)
             }
