@@ -100,11 +100,20 @@ class CodeGenerator {
         if let type = type as? NonNullType {
             return try renderType(type.type, isOptional: false)
         } else if let type = type as? NamedType {
-            return "\(type.name.value)\(isOptional ? "??" : "")"
+            return "\(mapTypeName(type))\(isOptional ? "??" : "")"
         } else if let type = type as? ListType {
             return "[\(try renderType(type.type))]\(isOptional ? "??" : "")"
         } else {
             throw CodegenError.unsupportedType(String(describing: type))
+        }
+    }
+
+    private func mapTypeName(_ type: NamedType) -> String {
+        switch type.name.value {
+        case "Boolean":
+            return "Bool"
+        default:
+            return type.name.value
         }
     }
 }
