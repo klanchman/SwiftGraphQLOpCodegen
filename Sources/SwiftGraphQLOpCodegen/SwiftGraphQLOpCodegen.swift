@@ -6,8 +6,8 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
         commandName: "swift-graphql-op-codegen"
     )
 
-    @Option(name: .shortAndLong, help: "The directory to output generated files into")
-    var outdir: String
+    @Option(name: .shortAndLong, help: "The path of the file to output")
+    var output: String
 
     @Argument var files: [String]
 
@@ -34,14 +34,24 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
 
         do {
             let generatedFiles = try CodeGenerator(sources: sources).generate()
+            let content = generatedFiles.reduce(into: "") { partialResult, next in
+                partialResult += "\n\(next.content)"
+            }
 
-            // FIXME: Output the files
-            for generatedFile in generatedFiles {
-                print("\nGenerate file: \(generatedFile.path)\n")
-                print(generatedFile.content)
+            guard
+                fm.createFile(
+                    atPath: output,
+                    contents: content.data(using: .utf8)
+                )
+            else {
+                throw ExecutionError.couldNotSaveFile
             }
         } catch {
             print("\nError running codegen: \(error)")
         }
+    }
+
+    enum ExecutionError: Error {
+        case couldNotSaveFile
     }
 }
