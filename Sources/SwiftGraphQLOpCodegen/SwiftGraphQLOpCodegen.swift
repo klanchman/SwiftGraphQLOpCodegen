@@ -33,7 +33,7 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
         }
 
         do {
-            let generatedFiles = try CodeGenerator(sources: sources).generate()
+            let generatedFiles = try SwiftCodeGenerator(sources: sources).generate()
             let content = generatedFiles.reduce(into: "") { partialResult, next in
                 partialResult += "\n\(next.content)"
             }
