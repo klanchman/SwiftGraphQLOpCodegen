@@ -7,6 +7,9 @@ let package = Package(
     platforms: [
         .macOS(.v11)
     ],
+    products: [
+        .executable(name: "swift-graphql-op-codegen", targets: ["swift-graphql-op-codegen"])
+    ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.0.3"),
         .package(url: "https://github.com/GraphQLSwift/GraphQL.git", from: "2.2.1"),
