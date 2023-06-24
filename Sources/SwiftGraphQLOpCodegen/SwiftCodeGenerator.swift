@@ -22,16 +22,20 @@ class SwiftCodeGenerator {
             var variables: Variables { get }
         }
 
+        enum APIOperation {}
+
         """))
 
         for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
             let mergedSource = try mergeFragments(operation: operation)
 
             let s = #"""
-                struct \#(operationName): GraphQLOperation {
-                    let operationName = "\#(operationName)"
-                    let query = "\#(mergedSource)"
-                    \#(try renderVariables(operation: operation.definition))
+                extension APIOperation {
+                    struct \#(operationName): GraphQLOperation {
+                        let operationName = "\#(operationName)"
+                        let query = "\#(mergedSource)"
+                        \#(try renderVariables(operation: operation.definition))
+                    }
                 }
 
                 """#
@@ -94,11 +98,11 @@ class SwiftCodeGenerator {
         return """
             let variables: Variables
 
-                struct Variables: Encodable {
-                    \(try operation.variableDefinitions
-                        .map { try renderVariable($0) }
-                        .joined(separator: "\n        "))
-                }
+                    struct Variables: Encodable {
+                        \(try operation.variableDefinitions
+                            .map { try renderVariable($0) }
+                            .joined(separator: "\n            "))
+                    }
             """
     }
 
