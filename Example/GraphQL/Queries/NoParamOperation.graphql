@@ -1,0 +1,5 @@
+query NoParamOperation {
+  search {
+    __typename
+  }
+}

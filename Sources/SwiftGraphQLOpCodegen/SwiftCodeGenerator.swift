@@ -13,11 +13,22 @@ class SwiftCodeGenerator {
     func generate() throws -> [File] {
         var files = [File]()
 
+        files.append(.init(path: "GraphQLOperation.swift", content: """
+        protocol GraphQLOperation<Variables>: Encodable {
+            associatedtype Variables: Encodable
+
+            var operationName: String { get }
+            var query: String { get }
+            var variables: Variables { get }
+        }
+
+        """))
+
         for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
             let mergedSource = try mergeFragments(operation: operation)
 
             let s = #"""
-                struct \#(operationName): Encodable {
+                struct \#(operationName): GraphQLOperation {
                     let operationName = "\#(operationName)"
                     let query = "\#(mergedSource)"
                     \#(try renderVariables(operation: operation.definition))
@@ -71,7 +82,13 @@ class SwiftCodeGenerator {
     }
 
     private func renderVariables(operation: OperationDefinition) throws -> String {
-        guard !operation.variableDefinitions.isEmpty else { return "" }
+        guard !operation.variableDefinitions.isEmpty else {
+            // TODO: Switch to Never once SE-0396 is available
+            // https://github.com/apple/swift-evolution/blob/main/proposals/0396-never-codable.md
+            return """
+            let variables: [String: String]? = nil
+            """
+        }
 
         // FIXME: Handle indentation better
         return """
