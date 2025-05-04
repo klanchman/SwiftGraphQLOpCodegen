@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:6.1
 
 import PackageDescription
 
@@ -11,8 +11,8 @@ let package = Package(
         .executable(name: "swift-graphql-op-codegen", targets: ["swift-graphql-op-codegen"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.0.3"),
-        .package(url: "https://github.com/GraphQLSwift/GraphQL.git", from: "2.2.1"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/GraphQLSwift/GraphQL.git", from: "3.0.2")
     ],
     targets: [
         .executableTarget(
@@ -23,12 +23,13 @@ let package = Package(
             name: "SwiftGraphQLOpCodegen",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "GraphQL", package: "GraphQL"),
+                .product(name: "GraphQL", package: "GraphQL")
             ]
         ),
         .testTarget(
             name: "SwiftGraphQLOpCodegenTests",
             dependencies: ["SwiftGraphQLOpCodegen"]
-        ),
-    ]
+        )
+    ],
+    swiftLanguageModes: [.v5]
 )

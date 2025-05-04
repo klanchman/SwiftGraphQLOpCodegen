@@ -1,0 +1,3 @@
+[tools]
+# For VS Code, remember to update workspace settings.json
+swift = "6.1"
