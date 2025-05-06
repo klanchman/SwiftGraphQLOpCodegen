@@ -12,7 +12,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
-        .package(url: "https://github.com/GraphQLSwift/GraphQL.git", from: "3.0.2")
+        .package(url: "https://github.com/GraphQLSwift/GraphQL.git", from: "3.0.2"),
     ],
     targets: [
         .executableTarget(
@@ -23,13 +23,13 @@ let package = Package(
             name: "SwiftGraphQLOpCodegen",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "GraphQL", package: "GraphQL")
+                .product(name: "GraphQL", package: "GraphQL"),
             ]
         ),
         .testTarget(
             name: "SwiftGraphQLOpCodegenTests",
             dependencies: ["SwiftGraphQLOpCodegen"]
-        )
+        ),
     ],
     swiftLanguageModes: [.v5]
 )

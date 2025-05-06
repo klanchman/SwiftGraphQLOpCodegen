@@ -1,3 +1,15 @@
 [tools]
 # For VS Code, remember to update workspace settings.json
 swift = "6.1"
+
+[tasks.format]
+quiet = true
+run = """
+if [ '{{flag(name='lint')}}' = 'true' ]; then
+  OPERATION="lint --strict"
+else
+  OPERATION="format --in-place"
+fi
+
+swift format $OPERATION --parallel --configuration swift-format.json --recursive Package.swift Sources Tests
+"""
