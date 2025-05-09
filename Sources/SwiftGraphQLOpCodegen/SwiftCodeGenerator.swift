@@ -1,5 +1,6 @@
 import Foundation
 import GraphQL
+import Stencil
 
 class SwiftCodeGenerator {
     private let context: GraphQLContext
@@ -13,42 +14,67 @@ class SwiftCodeGenerator {
     func generate() throws -> [File] {
         var files = [File]()
 
+        let stencilEnv = Stencil.Environment()
+
+        // FIXME: Allow passing in templates / template path
+        let protocolTemplatePath = Bundle.module.path(
+            forResource: "GraphQLOperation",
+            ofType: "stencil",
+            inDirectory: "Templates"
+        )
+        let protocolTemplateData = FileManager.default.contents(atPath: protocolTemplatePath!)
+        let protocolTemplate = String(data: protocolTemplateData!, encoding: .utf8)!
+
+        let operationTemplatePath = Bundle.module.path(
+            forResource: "Operation",
+            ofType: "stencil",
+            inDirectory: "Templates"
+        )
+        let operationTemplateData = FileManager.default.contents(atPath: operationTemplatePath!)
+        let operationTemplate = String(data: operationTemplateData!, encoding: .utf8)!
+
         files.append(
             .init(
                 path: "GraphQLOperation.swift",
-                content: """
-                    protocol GraphQLOperation<Variables>: Encodable {
-                        associatedtype Variables: Encodable
-
-                        var operationName: String { get }
-                        var query: String { get }
-                        var variables: Variables { get }
-                    }
-
-                    enum APIOperation {}
-
-                    """
+                content: try stencilEnv.renderTemplate(string: protocolTemplate)
             )
         )
 
         for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
             let mergedSource = try mergeFragments(operation: operation)
-
-            let s = #"""
-                extension APIOperation {
-                    struct \#(operationName): GraphQLOperation {
-                        let operationName = "\#(operationName)"
-                        let query = "\#(mergedSource)"
-                        \#(try renderVariables(operation: operation.definition))
-                    }
+            let operationType =
+                switch operation.definition.operation {
+                case .mutation: "Mutation"
+                case .query: "Query"
+                case .subscription: "Subscription"
                 }
 
-                """#
+            let s = try stencilEnv.renderTemplate(
+                string: operationTemplate,
+                context: [
+                    "operation": [
+                        "name": operationName,
+                        "mergedSource": mergedSource,
+                        "variables": stencilVariablesContext(operation.definition),
+                    ]
+                ]
+            )
 
-            files.append(File(path: "\(operationName).swift", content: s))
+            files.append(File(path: "\(operationName)\(operationType).swift", content: s))
         }
 
         return files
+    }
+
+    private func stencilVariablesContext(
+        _ operation: OperationDefinition
+    ) throws -> [[String: Any]] {
+        try operation.variableDefinitions.map { varDef in
+            return [
+                "name": varDef.variable.name.value,
+                "swiftType": try renderSwiftType(varDef.type),
+            ]
+        }
     }
 
     private func mergeFragments(operation: DefWrapper<OperationDefinition>) throws -> String {
@@ -90,38 +116,13 @@ class SwiftCodeGenerator {
         return referencedFragments
     }
 
-    private func renderVariables(operation: OperationDefinition) throws -> String {
-        guard !operation.variableDefinitions.isEmpty else {
-            // TODO: Switch to Never once SE-0396 is available
-            // https://github.com/apple/swift-evolution/blob/main/proposals/0396-never-codable.md
-            return """
-                let variables: [String: String]? = nil
-                """
-        }
-
-        // FIXME: Handle indentation better
-        return """
-            let variables: Variables
-
-                    struct Variables: Encodable {
-                        \(try operation.variableDefinitions
-                            .map { try renderVariable($0) }
-                            .joined(separator: "\n            "))
-                    }
-            """
-    }
-
-    private func renderVariable(_ variable: VariableDefinition) throws -> String {
-        "let \(variable.variable.name.value): \(try renderType(variable.type))"
-    }
-
-    private func renderType(_ type: Type, isOptional: Bool = true) throws -> String {
+    private func renderSwiftType(_ type: Type, isOptional: Bool = true) throws -> String {
         if let type = type as? NonNullType {
-            return try renderType(type.type, isOptional: false)
+            return try renderSwiftType(type.type, isOptional: false)
         } else if let type = type as? NamedType {
             return "\(mapTypeName(type))\(isOptional ? "??" : "")"
         } else if let type = type as? ListType {
-            return "[\(try renderType(type.type))]\(isOptional ? "??" : "")"
+            return "[\(try renderSwiftType(type.type))]\(isOptional ? "??" : "")"
         } else {
             throw CodegenError.unsupportedType(String(describing: type))
         }

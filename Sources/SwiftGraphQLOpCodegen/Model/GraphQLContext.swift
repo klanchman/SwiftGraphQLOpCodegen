@@ -28,7 +28,7 @@ class GraphQLContext {
                     let op = DefWrapper(definition: definition)
                     fragments[op.definition.name.value] = op
                 } else {
-                    // FIXME: Verbose
+                    // TODO: Verbose log
                     print(
                         "Ignoring unknown definition of type \(definition.kind) in \(source.path)"
                     )
@@ -60,7 +60,7 @@ class DefWrapper<Def: NamedDefWithSelSet> {
             }
         }
 
-        // FIXME: Debug
+        // TODO: Debug log
         print(
             "\(definition.kind) \(String(describing: definition.internalName?.value)) spreads fragments \(fragmentReferences)"
         )

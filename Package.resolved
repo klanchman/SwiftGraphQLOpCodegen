@@ -1,5 +1,5 @@
 {
-  "originHash" : "09977fd96f0f62812994dbb7469c4f715d3c3dde741066dcac6fc1571a60f6a0",
+  "originHash" : "db6bb8ca3ee81ce93dc94c6b1b8838a21af93efccc94775b78b2605b84baafa3",
   "pins" : [
     {
       "identity" : "graphql",
@@ -8,6 +8,33 @@
       "state" : {
         "revision" : "bd5419f714043bdaf0f182838111fa8c9372c77f",
         "version" : "3.0.2"
+      }
+    },
+    {
+      "identity" : "pathkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kylef/PathKit.git",
+      "state" : {
+        "revision" : "3bfd2737b700b9a36565a8c94f4ad2b050a5e574",
+        "version" : "1.0.1"
+      }
+    },
+    {
+      "identity" : "spectre",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kylef/Spectre.git",
+      "state" : {
+        "revision" : "26cc5e9ae0947092c7139ef7ba612e34646086c7",
+        "version" : "0.10.1"
+      }
+    },
+    {
+      "identity" : "stencil",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/stencilproject/Stencil.git",
+      "state" : {
+        "revision" : "4f222ac85d673f35df29962fc4c36ccfdaf9da5b",
+        "version" : "0.15.1"
       }
     },
     {

@@ -6,15 +6,23 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
         commandName: "swift-graphql-op-codegen"
     )
 
-    @Option(name: .shortAndLong, help: "The path of the file to output")
+    @Option(
+        name: .shortAndLong,
+        help: "The directory into which files will be generated."
+    )
     var output: String
+
+    @Flag(name: .long, help: "Do not prompt if output would delete existing files.")
+    var force = false
+
+    // FIXME: Command to dump template files, option to provide template files
 
     @Argument var files: [String]
 
     public init() {}
 
     public func run() throws {
-        // FIXME: Remove
+        // TODO: Debug log
         print("You gave us these files: \(files)")
 
         let fm = FileManager()
@@ -34,17 +42,31 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
 
         do {
             let generatedFiles = try SwiftCodeGenerator(sources: sources).generate()
-            let content = generatedFiles.reduce(into: "") { partialResult, next in
-                partialResult += "\n\(next.content)"
+            let outputURL = URL(fileURLWithPath: output, isDirectory: true)
+
+            if fm.fileExists(atPath: outputURL.path) {
+                if !force {
+                    print("Delete existing files at \(output)? (y/n) ", terminator: "")
+                    let answer = readLine()
+                    if answer?.lowercased() != "y" {
+                        Self.exit(withError: ExecutionError.aborted)
+                    }
+                }
+                try fm.removeItem(at: outputURL)
             }
 
-            guard
-                fm.createFile(
-                    atPath: output,
-                    contents: content.data(using: .utf8)
-                )
-            else {
-                throw ExecutionError.couldNotSaveFile
+            try fm.createDirectory(at: outputURL, withIntermediateDirectories: true)
+
+            for file in generatedFiles {
+                guard
+                    fm.createFile(
+                        atPath: outputURL.appendingPathComponent(file.path, isDirectory: false)
+                            .path,
+                        contents: file.content.data(using: .utf8)
+                    )
+                else {
+                    throw ExecutionError.couldNotSaveFile
+                }
             }
         } catch {
             print("\nError running codegen: \(error)")
@@ -52,6 +74,7 @@ public struct SwiftGraphQLOpCodegen: ParsableCommand {
     }
 
     enum ExecutionError: Error {
+        case aborted
         case couldNotSaveFile
     }
 }
