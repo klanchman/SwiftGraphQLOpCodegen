@@ -1,6 +1,7 @@
 import Foundation
+import PathKit
 
 struct File {
-    let path: String
+    let path: Path
     let content: String
 }

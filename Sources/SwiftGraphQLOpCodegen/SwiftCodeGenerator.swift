@@ -1,44 +1,33 @@
 import Foundation
 import GraphQL
+import PathKit
 import Stencil
 
 class SwiftCodeGenerator {
     private let context: GraphQLContext
+    private let protocolTemplate: File
+    private let operationTemplate: File
 
     init(
-        sources: [File]
+        sources: [File],
+        protocolTemplate: File?,
+        operationTemplate: File?
     ) throws {
         self.context = try GraphQLContext(sources: sources)
+
+        let bundledTemplates = try TemplateFiles()
+        self.protocolTemplate = protocolTemplate ?? bundledTemplates.protocolTemplate
+        self.operationTemplate = operationTemplate ?? bundledTemplates.operationTemplate
     }
 
     func generate() throws -> [File] {
-        var files = [File]()
-
         let stencilEnv = Stencil.Environment()
-
-        // FIXME: Allow passing in templates / template path
-        let protocolTemplatePath = Bundle.module.path(
-            forResource: "GraphQLOperation",
-            ofType: "stencil",
-            inDirectory: "Templates"
-        )
-        let protocolTemplateData = FileManager.default.contents(atPath: protocolTemplatePath!)
-        let protocolTemplate = String(data: protocolTemplateData!, encoding: .utf8)!
-
-        let operationTemplatePath = Bundle.module.path(
-            forResource: "Operation",
-            ofType: "stencil",
-            inDirectory: "Templates"
-        )
-        let operationTemplateData = FileManager.default.contents(atPath: operationTemplatePath!)
-        let operationTemplate = String(data: operationTemplateData!, encoding: .utf8)!
-
-        files.append(
-            .init(
+        var files = [
+            File(
                 path: "GraphQLOperation.swift",
-                content: try stencilEnv.renderTemplate(string: protocolTemplate)
+                content: try stencilEnv.renderTemplate(string: protocolTemplate.content)
             )
-        )
+        ]
 
         for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
             let mergedSource = try mergeFragments(operation: operation)
@@ -50,7 +39,7 @@ class SwiftCodeGenerator {
                 }
 
             let s = try stencilEnv.renderTemplate(
-                string: operationTemplate,
+                string: operationTemplate.content,
                 context: [
                     "operation": [
                         "name": operationName,
@@ -60,7 +49,7 @@ class SwiftCodeGenerator {
                 ]
             )
 
-            files.append(File(path: "\(operationName)\(operationType).swift", content: s))
+            files.append(File(path: Path("\(operationName)\(operationType).swift"), content: s))
         }
 
         return files

@@ -19,6 +19,7 @@ class GraphQLContext {
                     let op = DefWrapper(definition: definition)
 
                     guard let name = definition.name?.value else {
+                        // TODO: Warning log
                         print("Warning: Ignoring unnamed operation in file \(source.path)")
                         continue
                     }

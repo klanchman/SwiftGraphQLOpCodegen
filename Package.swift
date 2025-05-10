@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/GraphQLSwift/GraphQL.git", from: "3.0.2"),
         .package(url: "https://github.com/stencilproject/Stencil.git", exact: "0.15.1"),
+        .package(url: "https://github.com/kylef/PathKit.git", from: "1.0.1"),
     ],
     targets: [
         .executableTarget(
@@ -24,7 +25,8 @@ let package = Package(
             name: "SwiftGraphQLOpCodegen",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "GraphQL", package: "GraphQL"),
+                "GraphQL",
+                "PathKit",
                 "Stencil",
             ],
             resources: [
