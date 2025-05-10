@@ -3,7 +3,7 @@ extension APIOperation {
         let operationName = "{{ operation.name }}"
         let query = "{{ operation.mergedSource }}"
         {%- if operation.variables.count == 0 %}
-        let variables: Never
+        let variables: [String: String]? = nil
         {%- else %}
         let variables: Variables
 

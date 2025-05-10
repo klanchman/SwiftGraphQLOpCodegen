@@ -13,3 +13,10 @@ fi
 
 swift format $OPERATION --parallel --configuration swift-format.json --recursive Package.swift Sources Tests
 """
+
+[tasks.generate-examples]
+quiet = true
+run = """
+swift run swift-graphql-op-codegen --overwrite --single-file --output Example/Generated/SingleFile.swift Example/GraphQL/**/*.graphql
+swift run swift-graphql-op-codegen --overwrite --output Example/Generated/Multiple Example/GraphQL/**/*.graphql
+"""
