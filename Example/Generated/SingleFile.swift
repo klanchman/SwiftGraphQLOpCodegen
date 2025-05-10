@@ -1,4 +1,3 @@
-
 protocol GraphQLOperation<Variables>: Encodable {
     associatedtype Variables: Encodable
 

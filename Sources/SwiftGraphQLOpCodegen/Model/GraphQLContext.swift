@@ -19,6 +19,7 @@ class GraphQLContext {
                     let op = DefWrapper(definition: definition)
 
                     guard let name = definition.name?.value else {
+                        // TODO: Warning log
                         print("Warning: Ignoring unnamed operation in file \(source.path)")
                         continue
                     }
@@ -28,7 +29,7 @@ class GraphQLContext {
                     let op = DefWrapper(definition: definition)
                     fragments[op.definition.name.value] = op
                 } else {
-                    // FIXME: Verbose
+                    // TODO: Verbose log
                     print(
                         "Ignoring unknown definition of type \(definition.kind) in \(source.path)"
                     )
@@ -60,7 +61,7 @@ class DefWrapper<Def: NamedDefWithSelSet> {
             }
         }
 
-        // FIXME: Debug
+        // TODO: Debug log
         print(
             "\(definition.kind) \(String(describing: definition.internalName?.value)) spreads fragments \(fragmentReferences)"
         )

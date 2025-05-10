@@ -1,49 +1,98 @@
 import Foundation
 import GraphQL
+import PathKit
+import Stencil
 
 class SwiftCodeGenerator {
     private let context: GraphQLContext
+    private let singleFileMode: Bool
+    private let protocolTemplate: File
+    private let operationTemplate: File
+    private let allOperationsTemplate: File
 
     init(
-        sources: [File]
+        sources: [File],
+        singleFileMode: Bool,
+        protocolTemplate: File?,
+        operationTemplate: File?,
+        allOperationsTemplate: File?
     ) throws {
         self.context = try GraphQLContext(sources: sources)
+        self.singleFileMode = singleFileMode
+
+        let bundledTemplates = try TemplateFiles()
+        self.protocolTemplate = protocolTemplate ?? bundledTemplates.protocolTemplate
+        self.operationTemplate = operationTemplate ?? bundledTemplates.operationTemplate
+        self.allOperationsTemplate = allOperationsTemplate ?? bundledTemplates.allOperationsTemplate
     }
 
     func generate() throws -> [File] {
+        let stencilEnv = Stencil.Environment()
         var files = [File]()
 
-        files.append(.init(path: "GraphQLOperation.swift", content: """
-        protocol GraphQLOperation<Variables>: Encodable {
-            associatedtype Variables: Encodable
+        if singleFileMode {
+            var stencilOperations = [[String: Any]]()
 
-            var operationName: String { get }
-            var query: String { get }
-            var variables: Variables { get }
-        }
+            for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
+                let mergedSource = try mergeFragments(operation: operation)
 
-        enum APIOperation {}
+                stencilOperations.append([
+                    "name": operationName,
+                    "mergedSource": mergedSource,
+                    "variables": try stencilVariablesContext(operation.definition),
+                ])
+            }
 
-        """))
+            let s = try stencilEnv.renderTemplate(
+                string: allOperationsTemplate.content,
+                context: ["operations": stencilOperations]
+            )
 
-        for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
-            let mergedSource = try mergeFragments(operation: operation)
+            files.append(File(path: Path("APIOperations.swift"), content: s))
+        } else {
+            files.append(
+                File(
+                    path: "GraphQLOperation.swift",
+                    content: try stencilEnv.renderTemplate(string: protocolTemplate.content)
+                )
+            )
 
-            let s = #"""
-                extension APIOperation {
-                    struct \#(operationName): GraphQLOperation {
-                        let operationName = "\#(operationName)"
-                        let query = "\#(mergedSource)"
-                        \#(try renderVariables(operation: operation.definition))
+            for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
+                let mergedSource = try mergeFragments(operation: operation)
+                let operationType =
+                    switch operation.definition.operation {
+                    case .mutation: "Mutation"
+                    case .query: "Query"
+                    case .subscription: "Subscription"
                     }
-                }
 
-                """#
+                let s = try stencilEnv.renderTemplate(
+                    string: operationTemplate.content,
+                    context: [
+                        "operation": [
+                            "name": operationName,
+                            "mergedSource": mergedSource,
+                            "variables": stencilVariablesContext(operation.definition),
+                        ]
+                    ]
+                )
 
-            files.append(File(path: "\(operationName).swift", content: s))
+                files.append(File(path: Path("\(operationName)\(operationType).swift"), content: s))
+            }
         }
 
         return files
+    }
+
+    private func stencilVariablesContext(
+        _ operation: OperationDefinition
+    ) throws -> [[String: Any]] {
+        try operation.variableDefinitions.map { varDef in
+            return [
+                "name": varDef.variable.name.value,
+                "swiftType": try renderSwiftType(varDef.type),
+            ]
+        }
     }
 
     private func mergeFragments(operation: DefWrapper<OperationDefinition>) throws -> String {
@@ -85,38 +134,13 @@ class SwiftCodeGenerator {
         return referencedFragments
     }
 
-    private func renderVariables(operation: OperationDefinition) throws -> String {
-        guard !operation.variableDefinitions.isEmpty else {
-            // TODO: Switch to Never once SE-0396 is available
-            // https://github.com/apple/swift-evolution/blob/main/proposals/0396-never-codable.md
-            return """
-            let variables: [String: String]? = nil
-            """
-        }
-
-        // FIXME: Handle indentation better
-        return """
-            let variables: Variables
-
-                    struct Variables: Encodable {
-                        \(try operation.variableDefinitions
-                            .map { try renderVariable($0) }
-                            .joined(separator: "\n            "))
-                    }
-            """
-    }
-
-    private func renderVariable(_ variable: VariableDefinition) throws -> String {
-        "let \(variable.variable.name.value): \(try renderType(variable.type))"
-    }
-
-    private func renderType(_ type: Type, isOptional: Bool = true) throws -> String {
+    private func renderSwiftType(_ type: Type, isOptional: Bool = true) throws -> String {
         if let type = type as? NonNullType {
-            return try renderType(type.type, isOptional: false)
+            return try renderSwiftType(type.type, isOptional: false)
         } else if let type = type as? NamedType {
             return "\(mapTypeName(type))\(isOptional ? "??" : "")"
         } else if let type = type as? ListType {
-            return "[\(try renderType(type.type))]\(isOptional ? "??" : "")"
+            return "[\(try renderSwiftType(type.type))]\(isOptional ? "??" : "")"
         } else {
             throw CodegenError.unsupportedType(String(describing: type))
         }
