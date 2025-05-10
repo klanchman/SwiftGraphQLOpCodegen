@@ -1,0 +1,28 @@
+protocol GraphQLOperation<Variables>: Encodable {
+    associatedtype Variables: Encodable
+
+    var operationName: String { get }
+    var query: String { get }
+    var variables: Variables { get }
+}
+
+enum APIOperation {}
+{% for operation in operations %}
+extension APIOperation {
+    struct {{ operation.name }}: GraphQLOperation {
+        let operationName = "{{ operation.name }}"
+        let query = "{{ operation.mergedSource }}"
+        {%- if operation.variables.count == 0 %}
+        let variables: Never
+        {%- else %}
+        let variables: Variables
+
+        struct Variables: Encodable {
+        {%- for variable in operation.variables %}
+            let {{ variable.name }}: {{ variable.swiftType }}
+        {%- endfor %}
+        }
+        {%- endif %}
+    }
+}
+{% endfor -%}

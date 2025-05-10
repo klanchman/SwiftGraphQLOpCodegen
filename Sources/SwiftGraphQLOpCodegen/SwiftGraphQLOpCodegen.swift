@@ -90,16 +90,34 @@ extension SwiftGraphQLOpCodegen {
 
     struct Generate: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Generate Swift code from GraphQL operations."
+            abstract: "Generate Swift code from GraphQL operations.",
+            discussion: """
+                The tool can operate in two modes: multi-file (the default), and single-file.
+                In multi-file mode, one Swift file is created per GraphQL file, plus another Swift file containing common types.
+                In single-file mode, all operations and common types are combined into a single Swift file,
+                which can be easier to deal with if using Xcode.
+
+                EXAMPLES:
+                Multi-file: swift-graphql-op-codegen generate --output Example/Generated/Multiple Example/GraphQL/**/*.graphql
+                Single-file: swift-graphql-op-codegen generate --single-file --output Example/Generated/SingleFile.swift Example/GraphQL/**/*.graphql
+                """
         )
 
         @Option(
             name: .shortAndLong,
-            help: "The directory where the generated files will be saved.",
-            completion: .directory,
+            help: """
+                In multi-file mode: the directory where the generated files will be saved.
+                In single-file mode: the path where the generated file that will be saved.
+                """,
             transform: pathTransform
         )
         var output: Path
+
+        @Flag(
+            name: .long,
+            help: "Output generated code as a single file."
+        )
+        var singleFile = false
 
         @Flag(
             name: .long,
@@ -128,6 +146,22 @@ extension SwiftGraphQLOpCodegen {
 
         init() {}
 
+        func validate() throws {
+            if singleFile {
+                if output.exists && output.isDirectory {
+                    throw ValidationError(
+                        "'--single-file' mode expects '--output' to be a file, but a directory was provided"
+                    )
+                }
+            } else {
+                if output.exists && !output.isDirectory {
+                    throw ValidationError(
+                        "'--output' should be the path to a directory, but a file was provided"
+                    )
+                }
+            }
+        }
+
         func run() throws {
             // TODO: Debug log
             print("You gave us these files: \(files)")
@@ -144,8 +178,10 @@ extension SwiftGraphQLOpCodegen {
                 }
             }
 
+            var allOperationsTemplate: File?
             var operationTemplate: File?
             var protocolTemplate: File?
+
             if let templatePath {
                 let opPath = templatePath + Path("Operation.stencil")
                 if opPath.isFile {
@@ -156,72 +192,112 @@ extension SwiftGraphQLOpCodegen {
                 if protoPath.isFile {
                     protocolTemplate = File(path: protoPath, content: try protoPath.read())
                 }
+
+                let allOpPath = templatePath + Path("AllOperations.stencil")
+                if allOpPath.isFile {
+                    allOperationsTemplate = File(path: allOpPath, content: try allOpPath.read())
+                }
             }
 
             do {
                 let generatedFiles = try SwiftCodeGenerator(
                     sources: sources,
+                    singleFileMode: singleFile,
                     protocolTemplate: protocolTemplate,
-                    operationTemplate: operationTemplate
+                    operationTemplate: operationTemplate,
+                    allOperationsTemplate: allOperationsTemplate
                 ).generate()
 
-                if !output.exists {
-                    try output.mkpath()
-                    for file in generatedFiles {
-                        try (output + file.path).write(file.content)
-                    }
+                if singleFile {
+                    precondition(
+                        generatedFiles.count == 1,
+                        "Expected to generate 1 file, but got \(generatedFiles.count)"
+                    )
+
+                    try writeOneFile(generatedFiles.first!)
                 } else {
-                    let existingFiles = try output.children()
-
-                    for file in generatedFiles {
-                        let filePath = output + file.path
-                        if filePath.exists {
-                            if try filePath.read() == file.content {
-                                // TODO: Info log
-                                print("Contents of \(file.path) did not change, not saving")
-                                continue
-                            } else {
-                                guard
-                                    destructivePromptIfNeeded(
-                                        "Overwrite '\(filePath)'?",
-                                        overrideFlag: overwrite
-                                    )
-                                else {
-                                    // TODO: Info log
-                                    print("Skipping \(filePath)")
-                                    continue
-                                }
-
-                                try filePath.delete()
-                            }
-                        }
-
-                        try filePath.write(file.content)
-                    }
-
-                    let extraneousFiles = existingFiles.filter { existing in
-                        !generatedFiles.contains { output + $0.path == existing }
-                    }
-                    if !extraneousFiles.isEmpty {
-                        if destructivePromptIfNeeded(
-                            """
-                            Delete the following extraneous files?
-                            \(extraneousFiles.map(String.init).joined(separator: "\n"))
-                            """,
-                            overrideFlag: overwrite
-                        ) {
-                            for file in extraneousFiles {
-                                try file.delete()
-                            }
-                        } else {
-                            // TODO: Info log
-                            print("Keeping extraneous files")
-                        }
-                    }
+                    try writeMultipleFiles(generatedFiles)
                 }
             } catch {
                 // TODO: Error log
                 print("\nError running codegen: \(error)")
+            }
+        }
+
+        private func writeOneFile(_ file: File) throws {
+            if output.exists {
+                if try output.read() == file.content {
+                    // TODO: Info log
+                    print("Contents of \(output) did not change, not saving")
+                } else if destructivePromptIfNeeded(
+                    "Overwrite '\(output)'?",
+                    overrideFlag: overwrite
+                ) {
+                    try output.delete()
+                    try output.write(file.content)
+                } else {
+                    // TODO: Info log
+                    print("Skipping \(output)")
+                }
+            } else {
+                try output.write(file.content)
+            }
+        }
+
+        private func writeMultipleFiles(_ generatedFiles: [File]) throws {
+            if !output.exists {
+                try output.mkpath()
+                for file in generatedFiles {
+                    try (output + file.path).write(file.content)
+                }
+            } else {
+                let existingFiles = try output.children()
+
+                for file in generatedFiles {
+                    let filePath = output + file.path
+                    if filePath.exists {
+                        if try filePath.read() == file.content {
+                            // TODO: Info log
+                            print("Contents of \(file.path) did not change, not saving")
+                            continue
+                        } else {
+                            guard
+                                destructivePromptIfNeeded(
+                                    "Overwrite '\(filePath)'?",
+                                    overrideFlag: overwrite
+                                )
+                            else {
+                                // TODO: Info log
+                                print("Skipping \(filePath)")
+                                continue
+                            }
+
+                            try filePath.delete()
+                        }
+                    }
+
+                    try filePath.write(file.content)
+                }
+
+                let extraneousFiles = existingFiles.filter { existing in
+                    !generatedFiles.contains { output + $0.path == existing }
+                }
+                if !extraneousFiles.isEmpty {
+                    if destructivePromptIfNeeded(
+                        """
+                        Delete the following extraneous files?
+                        \(extraneousFiles.map(String.init).joined(separator: "\n"))
+                        """,
+                        overrideFlag: overwrite
+                    ) {
+                        for file in extraneousFiles {
+                            try file.delete()
+                        }
+                    } else {
+                        // TODO: Info log
+                        print("Keeping extraneous files")
+                    }
+                }
             }
         }
 

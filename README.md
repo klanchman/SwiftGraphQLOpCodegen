@@ -28,41 +28,54 @@ swift build -c release
 
 ## Usage
 
-To generate code, use the `generate` command. Provide the `--output` option
-the path to the directory where Swift files will be created, plus a list of
-GraphQL files that contain the operations you want to generate code from and any
-supporting types those files reference, like fragments. Use the `--overwrite` flag
-to overwrite existing files without prompting (useful in scripts).
-
-For example, if you wanted to generate code for the operations in the Example folder in this repo,
-and save the Swift files to `Example/Generated/`, you could run this command:
-
-```
-swift-graphql-op-codegen generate --output Example/Generated Example/GraphQL/**/*.graphql
-```
-
-If you want to customize the generated code, first export the templates with the `export-templates` command:
-```
-swift-graphql-op-codegen export-templates <export-directory>
-```
-
-Edit the templates as needed, then use the `generate` command's `--templatePath`
-option to point to your custom templates. Your template files must have the same
-names provided by the `export-templates` command. You can override as many or as
-few templates as you'd like in this directory. Any templates not found in this
-path will default to the template provided by the tool.
+Run `swift-graphql-op-codegen --help` for usage information.
 
 ## Templates
 
-There are 2 templates available to customize, described below.
+There are 3 templates available to customize, described below.
 Templates are written using [Stencil](https://github.com/stencilproject/Stencil).
-The context available to them is described as a Swift type.
+The context available to them is described below using Swift types.
+
+### AllOperations.stencil
+
+Used in single-file mode. This template contains shared types used by operations
+and the operations themselves.
+
+#### Context
+
+```swift
+struct Context {
+  let operations: [Operation]
+
+  struct Operation {
+    /// The name of the operation.
+    name: String
+    /// The GraphQL source of the operation including necessary fragments, in a minified format.
+    mergedSource: String
+    /// Input variable definitions.
+    variables: [Variable]
+
+    struct Variable {
+      /// The name of the variable.
+      let name: String
+
+      /// A Swift type equivalent to the GraphQL type of the variable.
+      ///
+      /// GraphQL optionals are rendered as "double optionals" in Swift. For example,
+      /// a GraphQL `String` is rendered as `String??` in Swift. This allows you to
+      /// pass 3 kinds of values: a String, nil/undefined, and null (`.some(nil)` in Swift),
+      /// since some GraphQL APIs distinguish between undefined and null.
+      let swiftType: String
+    }
+  }
+}
+```
 
 ### GraphQLOperation.stencil
 
-This template contains shared types used by operations. The default template
-defines a protocol for operations to conform to, and an empty enum to use as a
-namespace for your operations.
+Used in multi-file mode. This template contains shared types used by operations.
+The default template defines a protocol for operations to conform to,
+and an empty enum to use as a namespace for your operations.
 
 #### Context
 
@@ -70,7 +83,7 @@ None
 
 ### Operation.stencil
 
-This template defines how individual operations are generated.
+Used in multi-file mode. This template defines how individual operations are generated.
 
 #### Context
 

@@ -5,51 +5,80 @@ import Stencil
 
 class SwiftCodeGenerator {
     private let context: GraphQLContext
+    private let singleFileMode: Bool
     private let protocolTemplate: File
     private let operationTemplate: File
+    private let allOperationsTemplate: File
 
     init(
         sources: [File],
+        singleFileMode: Bool,
         protocolTemplate: File?,
-        operationTemplate: File?
+        operationTemplate: File?,
+        allOperationsTemplate: File?
     ) throws {
         self.context = try GraphQLContext(sources: sources)
+        self.singleFileMode = singleFileMode
 
         let bundledTemplates = try TemplateFiles()
         self.protocolTemplate = protocolTemplate ?? bundledTemplates.protocolTemplate
         self.operationTemplate = operationTemplate ?? bundledTemplates.operationTemplate
+        self.allOperationsTemplate = allOperationsTemplate ?? bundledTemplates.allOperationsTemplate
     }
 
     func generate() throws -> [File] {
         let stencilEnv = Stencil.Environment()
-        var files = [
-            File(
-                path: "GraphQLOperation.swift",
-                content: try stencilEnv.renderTemplate(string: protocolTemplate.content)
-            )
-        ]
+        var files = [File]()
 
-        for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
-            let mergedSource = try mergeFragments(operation: operation)
-            let operationType =
-                switch operation.definition.operation {
-                case .mutation: "Mutation"
-                case .query: "Query"
-                case .subscription: "Subscription"
-                }
+        if singleFileMode {
+            var stencilOperations = [[String: Any]]()
+
+            for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
+                let mergedSource = try mergeFragments(operation: operation)
+
+                stencilOperations.append([
+                    "name": operationName,
+                    "mergedSource": mergedSource,
+                    "variables": try stencilVariablesContext(operation.definition),
+                ])
+            }
 
             let s = try stencilEnv.renderTemplate(
-                string: operationTemplate.content,
-                context: [
-                    "operation": [
-                        "name": operationName,
-                        "mergedSource": mergedSource,
-                        "variables": stencilVariablesContext(operation.definition),
-                    ]
-                ]
+                string: allOperationsTemplate.content,
+                context: ["operations": stencilOperations]
             )
 
-            files.append(File(path: Path("\(operationName)\(operationType).swift"), content: s))
+            files.append(File(path: Path("APIOperations.swift"), content: s))
+        } else {
+            files.append(
+                File(
+                    path: "GraphQLOperation.swift",
+                    content: try stencilEnv.renderTemplate(string: protocolTemplate.content)
+                )
+            )
+
+            for (operationName, operation) in context.operations.sorted(by: { $0.key < $1.key }) {
+                let mergedSource = try mergeFragments(operation: operation)
+                let operationType =
+                    switch operation.definition.operation {
+                    case .mutation: "Mutation"
+                    case .query: "Query"
+                    case .subscription: "Subscription"
+                    }
+
+                let s = try stencilEnv.renderTemplate(
+                    string: operationTemplate.content,
+                    context: [
+                        "operation": [
+                            "name": operationName,
+                            "mergedSource": mergedSource,
+                            "variables": stencilVariablesContext(operation.definition),
+                        ]
+                    ]
+                )
+
+                files.append(File(path: Path("\(operationName)\(operationType).swift"), content: s))
+            }
         }
 
         return files
