@@ -2,8 +2,6 @@ import ArgumentParser
 import Foundation
 import PathKit
 
-private let pathTransform = { (s: String) in Path(s) }
-
 public struct SwiftGraphQLOpCodegen: ParsableCommand {
     public static var configuration: CommandConfiguration = .init(
         commandName: "swift-graphql-op-codegen",
@@ -64,15 +62,15 @@ extension SwiftGraphQLOpCodegen {
                 let fileOutputPath = outputPath + Path(filename)
 
                 if fileOutputPath.exists {
-                    print("Overwrite existing file at '\(fileOutputPath)'? (y/n) ", terminator: "")
-                    let answer = readLine()
-                    if answer?.lowercased() == "y" {
-                        try fileOutputPath.delete()
-                    } else {
+                    guard
+                        destructivePromptIfNeeded("Overwrite existing file at '\(fileOutputPath)'?")
+                    else {
                         // TODO: Info log
                         print("Skipping \(fileOutputPath)")
                         continue
                     }
+
+                    try fileOutputPath.delete()
                 }
 
                 try path.copy(fileOutputPath)
@@ -103,7 +101,10 @@ extension SwiftGraphQLOpCodegen {
         )
         var output: Path
 
-        @Flag(name: .long, help: "Overwrite existing files without prompting.")
+        @Flag(
+            name: .long,
+            help: "Overwrite existing files and delete extraneous files without prompting."
+        )
         var overwrite = false
 
         @Option(
@@ -164,21 +165,59 @@ extension SwiftGraphQLOpCodegen {
                     operationTemplate: operationTemplate
                 ).generate()
 
-                if output.exists {
-                    if !overwrite {
-                        print("Delete existing files at '\(output)'? (y/n) ", terminator: "")
-                        let answer = readLine()
-                        if answer?.lowercased() != "y" {
-                            Self.exit(withError: ExecutionError.aborted)
+                if !output.exists {
+                    try output.mkpath()
+                    for file in generatedFiles {
+                        try (output + file.path).write(file.content)
+                    }
+                } else {
+                    let existingFiles = try output.children()
+
+                    for file in generatedFiles {
+                        let filePath = output + file.path
+                        if filePath.exists {
+                            if try filePath.read() == file.content {
+                                // TODO: Info log
+                                print("Contents of \(file.path) did not change, not saving")
+                                continue
+                            } else {
+                                guard
+                                    destructivePromptIfNeeded(
+                                        "Overwrite '\(filePath)'?",
+                                        overrideFlag: overwrite
+                                    )
+                                else {
+                                    // TODO: Info log
+                                    print("Skipping \(filePath)")
+                                    continue
+                                }
+
+                                try filePath.delete()
+                            }
+                        }
+
+                        try filePath.write(file.content)
+                    }
+
+                    let extraneousFiles = existingFiles.filter { existing in
+                        !generatedFiles.contains { output + $0.path == existing }
+                    }
+                    if !extraneousFiles.isEmpty {
+                        if destructivePromptIfNeeded(
+                            """
+                            Delete the following extraneous files?
+                            \(extraneousFiles.map(String.init).joined(separator: "\n"))
+                            """,
+                            overrideFlag: overwrite
+                        ) {
+                            for file in extraneousFiles {
+                                try file.delete()
+                            }
+                        } else {
+                            // TODO: Info log
+                            print("Keeping extraneous files")
                         }
                     }
-                    try output.delete()
-                }
-
-                try output.mkpath()
-
-                for file in generatedFiles {
-                    try (output + file.path).write(file.content)
                 }
             } catch {
                 // TODO: Error log
@@ -198,4 +237,30 @@ extension SwiftGraphQLOpCodegen {
             }
         }
     }
+}
+
+private let pathTransform = { (s: String) in Path(s) }
+
+/// Get the user's consent before performing a destructive action if needed.
+///
+/// The provided message is printed with a "(y/N)" prompt following it. The user
+/// must enter "y" or "Y" to perform the action. Any other input is treated as
+/// refusal. If `overrideFlag` is true, this function returns true without
+/// prompting the user.
+///
+/// - Parameters:
+///   - message: The prompt to show to the user
+///   - overrideFlag: A flag the user can pass to the command indicating whether to skip
+///     these kinds of prompts
+/// - Returns: a Bool indicating whether permission was granted to perform the action
+private func destructivePromptIfNeeded(
+    _ message: String,
+    overrideFlag: Bool? = nil
+) -> Bool {
+    guard overrideFlag != true else { return true }
+    let promptSeparator = message.contains("\n") ? "\n" : " "
+    let finalMessage = message + promptSeparator + "(y/N)"
+    print(finalMessage, terminator: " ")
+    let answer = readLine()
+    return answer?.lowercased() == "y"
 }
