@@ -34,7 +34,14 @@ GraphQL files that contain the operations you want to generate code from and any
 supporting types those files reference, like fragments. Use the `--overwrite` flag
 to overwrite existing files without prompting (useful in scripts).
 
-To customize the generated code, first export the templates somewhere:
+For example, if you wanted to generate code for the operations in the Example folder in this repo,
+and save the Swift files to `Example/Generated/`, you could run this command:
+
+```
+swift-graphql-op-codegen generate --output Example/Generated Example/GraphQL/**/*.graphql
+```
+
+If you want to customize the generated code, first export the templates with the `export-templates` command:
 ```
 swift-graphql-op-codegen export-templates <export-directory>
 ```
@@ -43,16 +50,7 @@ Edit the templates as needed, then use the `generate` command's `--templatePath`
 option to point to your custom templates. Your template files must have the same
 names provided by the `export-templates` command. You can override as many or as
 few templates as you'd like in this directory. Any templates not found in this
-path will fall back to the default template provided by the tool.
-
-### Example
-
-If you wanted to generate code for the operations in the Example folder in this repo,
-and save the Swift files to `Example/Generated/`, you could run this command:
-
-```
-swift-graphql-op-codegen generate --output Example/Generated Example/GraphQL/**/*.graphql
-```
+path will default to the template provided by the tool.
 
 ## Templates
 
