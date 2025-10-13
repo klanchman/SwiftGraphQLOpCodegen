@@ -47,18 +47,14 @@ extension SwiftGraphQLOpCodegen {
                 try outputPath.mkpath()
             }
 
-            guard
-                let templates = Bundle.module.urls(
-                    forResourcesWithExtension: "stencil",
-                    subdirectory: "Templates"
-                )
-            else {
-                throw ExecutionError.couldNotReadTemplates
-            }
+            let templates = Bundle.module.paths(
+                forResourcesOfType: "stencil",
+                inDirectory: "Templates"
+            )
 
             for template in templates {
-                let path = Path(template.path)
-                let filename = template.lastPathComponent
+                let path = Path(template)
+                let filename = path.lastComponent
                 let fileOutputPath = outputPath + Path(filename)
 
                 if fileOutputPath.exists {
@@ -74,16 +70,6 @@ extension SwiftGraphQLOpCodegen {
                 }
 
                 try path.copy(fileOutputPath)
-            }
-        }
-
-        enum ExecutionError: Error, CustomStringConvertible {
-            case couldNotReadTemplates
-
-            var description: String {
-                switch self {
-                case .couldNotReadTemplates: "Could not read template files"
-                }
             }
         }
     }
